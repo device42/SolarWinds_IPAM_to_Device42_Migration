@@ -100,14 +100,14 @@ class SwisClient():
 
     def get_ips(self):
         ips = []
-        results = self.get_data({'query': 'SELECT ipaddress, mac, status, dhcpclientname FROM  IPAM.IPNode'})
+        results = self.get_data({'query': 'SELECT ipaddress, mac, status, dnsbackward FROM  IPAM.IPNode'})
         if results:
             for result in results['results']:
                 data = {}
                 ipaddress   = result['ipaddress']
                 macaddress  = result['mac']
                 status      = result['status']
-                devicename  = result['dhcpclientname']
+                devicename  = result['dnsbackward']
                 data.update({'ipaddress': ipaddress})
                 data.update({'macaddress': macaddress})
                 if status == 2:
