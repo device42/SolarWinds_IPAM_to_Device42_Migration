@@ -1,13 +1,13 @@
 [settings]
-# ====== ORION SETTINGS ================ #
-SW_IPAM_SERVER    		= https://10.10.255.12
-SW_IPAM_USER      		= admin
-SW_IPAM_SECRET    		=
+# ====== SOLARWINDS IPAM SETTINGS ================ #
+SW_IPAM_SERVER    		= https://SolarWinds_Server
+SW_IPAM_USER      		= solarwind_user
+SW_IPAM_SECRET    		= solarwind_password
 
 # ====== DEVICE42 SETTINGS ============= #
-D42_SERVER      		= https://192.168.3.30
-D42_USER        		= admin
-D42_SECRET      		= adm!nd42
+D42_SERVER      		= https://D42IP
+D42_USER        		= d42_user
+D42_SECRET      		= d42_pass
 
 # ====== OTHER SETTINGS ================ #
 MIGRATE_SUBNETS			= True
