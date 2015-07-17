@@ -5,6 +5,10 @@ import json
 import requests
 import base64
 import ConfigParser
+import threading
+import Queue
+import time
+
 
 try:
     requests.packages.urllib3.disable_warnings()
@@ -56,9 +60,9 @@ class Device42():
         print msg
         self.uploader(data, url)
 
-    def post_ip(self, data, ip):
+    def post_ip(self, data):
         url = self.base_url + '/api/ip/'
-        msg = '\r\n[!] Posting ip %s ' % ip
+        msg = '\r\n[!] Posting ip %s ' % data['ipaddress']
         print msg
         self.uploader(data, url)
 
@@ -99,9 +103,9 @@ class SwisClient():
                 d42.post_subnet(network, net)
 
     def get_ips(self):
-        ips = []
         results = self.get_data({'query': 'SELECT ipaddress, mac, status, dnsbackward FROM  IPAM.IPNode'})
         if results:
+            q = Queue.Queue()
             for result in results['results']:
                 data = {}
                 ipaddress   = result['ipaddress']
@@ -119,13 +123,25 @@ class SwisClient():
                         data.update({'device': devicename})
                     if hlabel:
                         data.update({'tag': devicename})
-
-                ips.append(data)
-
-            for ip in ips:
-                address = ip['ipaddress']
-                d42.post_ip(ip, address)
-
+                q.put(data)
+            while 1:
+                if not q.empty():
+                    tcount = threading.active_count()
+                    if tcount < 20:
+                        ip = q.get()
+                        print ip
+                        p = threading.Thread(target=d42.post_ip, args=(ip,) )
+                        p.start()
+                    else:
+                        time.sleep(0.5)
+                else:
+                    tcount = threading.active_count()
+                    while tcount > 1:
+                        time.sleep(1)
+                        tcount = threading.active_count()
+                        msg =  'Waiting for threads to finish. Current thread count: %s' % str(tcount)
+                        print msg
+                    break
 
 def read_settings():
     if not os.path.exists(CONFIG):

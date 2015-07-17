@@ -54,6 +54,7 @@ docs/_build/
 .test
 **/*.pyc
 **/*.log
+nohup.out
 
 #IDE
 .idea/
