@@ -2,13 +2,13 @@
 import sys
 import os
 import json
-import requests
 import base64
 import ConfigParser
 import threading
 import Queue
 import time
 
+import requests
 
 try:
     requests.packages.urllib3.disable_warnings()
