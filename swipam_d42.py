@@ -92,28 +92,13 @@ class SwisClient():
                 name    = result['friendlyname']
                 cidr    = result['cidr']
                 address = result['address']
+                print name, cidr, address
                 if address and address != '0.0.0.0':
-                    if self.include_broadcast:  # if the filter flag is off, proceed with original method
-                        data.update({'network': address})
-                        data.update({'mask_bits': cidr})
-                        data.update({'name': name})
-                        if data not in networks:
-                            networks.append(data)
-                    else:  # if the filter flag is on, check if the ip is a broadcast ip
-                        # check if the ip address ends in broadcast range
-                        split_ip = address.split('.')
-                        if len(split_ip) != 4:
-                            continue
-                        else:
-                            last_ip_range_digit = split_ip[3]
-                            if last_ip_range_digit == '0' or last_ip_range_digit == '255':  # ip is broadcast ip
-                                continue
-                            else:  # ip is a regular ip
-                                data.update({'network': address})
-                                data.update({'mask_bits': cidr})
-                                data.update({'name': name})
-                                if data not in networks:
-                                    networks.append(data)
+                    data.update({'network': address})
+                    data.update({'mask_bits': cidr})
+                    data.update({'name': name})
+                    if data not in networks:
+                        networks.append(data)
 
             for network in networks:
                 net = network['network']
@@ -121,6 +106,7 @@ class SwisClient():
 
     def get_ips(self):
         results = self.get_data({'query': 'SELECT ipaddress, mac, status, dnsbackward FROM  IPAM.IPNode'})
+
         if results:
             q = Queue.Queue()
             for result in results['results']:
@@ -129,6 +115,16 @@ class SwisClient():
                 macaddress  = result['mac']
                 status      = result['status']
                 devicename  = result['dnsbackward']
+                print ipaddress
+
+                if not self.include_broadcast:
+                    split_ip = ipaddress.split('.')
+                    last_ip_range_digit = split_ip[3]
+
+                    if last_ip_range_digit == '0' or last_ip_range_digit == '255':  # ip is broadcast ip
+                        print 'ip address {} is broadcast address, skipping'.format(ipaddress)
+                        continue
+
                 data.update({'ipaddress': ipaddress})
                 data.update({'macaddress': macaddress})
                 if status == 2:
@@ -193,8 +189,10 @@ if __name__ == "__main__":
     swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_broadcast)
 
     if migrate_subnets:
+        print 'getting subnets'
         swis.get_subnets()
     if migrate_ips:
+        print 'getting ips'
         swis.get_ips()
 
     print '\n[!] Done!'
