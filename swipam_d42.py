@@ -68,10 +68,11 @@ class Device42():
 
 
 class SwisClient():
-    def __init__(self, hostname, username, password):
+    def __init__(self, hostname, username, password, filter_brodcast):
         self.url            = "%s:17778/SolarWinds/InformationService/v3/Json/" % (hostname)
         self.credentials    = (username, password)
         self.headers        = {'Content-Type': 'application/json'}
+        self.filter         = filter_brodcast
 
     def get_data(self, payload=None):
         r = requests.request('POST', self.url + 'Query',
@@ -92,11 +93,27 @@ class SwisClient():
                 cidr    = result['cidr']
                 address = result['address']
                 if address and address != '0.0.0.0':
-                    data.update({'network': address})
-                    data.update({'mask_bits': cidr})
-                    data.update({'name': name})
-                    if data not in networks:
-                        networks.append(data)
+                    if not self.filter:  # if the filter flag is off, proceed with original method
+                        data.update({'network': address})
+                        data.update({'mask_bits': cidr})
+                        data.update({'name': name})
+                        if data not in networks:
+                            networks.append(data)
+                    else:  # if the filter flag is on, check if the ip is a broadcast ip
+                        # check if the ip address ends in broadcast range
+                        split_ip = address.split('.')
+                        if len(split_ip) != 4:
+                            continue
+                        else:
+                            last_ip_range_digit = split_ip[3]
+                            if last_ip_range_digit == '0' or last_ip_range_digit == '255':  # ip is broadcast ip
+                                continue
+                            else:  # ip is a regular ip
+                                data.update({'network': address})
+                                data.update({'mask_bits': cidr})
+                                data.update({'name': name})
+                                if data not in networks:
+                                    networks.append(data)
 
             for network in networks:
                 net = network['network']
@@ -162,17 +179,18 @@ def read_settings():
     debug           = cc.getboolean('settings', 'debug')
     hdevice         = cc.getboolean('settings', 'send_hostname_as_device')
     hlabel          = cc.getboolean('settings', 'send_hostname_as_label')
+    filter_brodcast = cc.getboolean('settings', 'include_brodcast_addresses')
 
     return sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-           migrate_subnets, migrate_ips, debug, hdevice, hlabel
+           migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_brodcast
 
 
 if __name__ == "__main__":
     sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-    migrate_subnets, migrate_ips, debug, hdevice, hlabel = read_settings()
+    migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_brodcast = read_settings()
 
     d42     = Device42(d42_server, d42_user, d42_secret, debug, hdevice, hlabel)
-    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret)
+    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_brodcast)
 
     if migrate_subnets:
         swis.get_subnets()
