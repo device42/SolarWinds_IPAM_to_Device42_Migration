@@ -68,11 +68,11 @@ class Device42():
 
 
 class SwisClient():
-    def __init__(self, hostname, username, password, filter_brodcast):
+    def __init__(self, hostname, username, password, filter_broadcast):
         self.url            = "%s:17778/SolarWinds/InformationService/v3/Json/" % (hostname)
         self.credentials    = (username, password)
         self.headers        = {'Content-Type': 'application/json'}
-        self.filter         = filter_brodcast
+        self.filter         = filter_broadcast
 
     def get_data(self, payload=None):
         r = requests.request('POST', self.url + 'Query',
@@ -179,18 +179,18 @@ def read_settings():
     debug           = cc.getboolean('settings', 'debug')
     hdevice         = cc.getboolean('settings', 'send_hostname_as_device')
     hlabel          = cc.getboolean('settings', 'send_hostname_as_label')
-    filter_brodcast = cc.getboolean('settings', 'include_brodcast_addresses')
+    filter_broadcast = cc.getboolean('settings', 'include_broadcast_addresses')
 
     return sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-           migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_brodcast
+           migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_broadcast
 
 
 if __name__ == "__main__":
     sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-    migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_brodcast = read_settings()
+    migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_broadcast = read_settings()
 
     d42     = Device42(d42_server, d42_user, d42_secret, debug, hdevice, hlabel)
-    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_brodcast)
+    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_broadcast)
 
     if migrate_subnets:
         swis.get_subnets()
