@@ -92,7 +92,6 @@ class SwisClient():
                 name    = result['friendlyname']
                 cidr    = result['cidr']
                 address = result['address']
-                print name, cidr, address
                 if address and address != '0.0.0.0':
                     data.update({'network': address})
                     data.update({'mask_bits': cidr})
