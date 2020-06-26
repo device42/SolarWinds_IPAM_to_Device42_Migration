@@ -72,7 +72,7 @@ class SwisClient():
         self.url            = "%s:17778/SolarWinds/InformationService/v3/Json/" % (hostname)
         self.credentials    = (username, password)
         self.headers        = {'Content-Type': 'application/json'}
-        self.filter         = filter_broadcast
+        self.include_broadcast         = filter_broadcast
 
     def get_data(self, payload=None):
         r = requests.request('POST', self.url + 'Query',
@@ -93,7 +93,7 @@ class SwisClient():
                 cidr    = result['cidr']
                 address = result['address']
                 if address and address != '0.0.0.0':
-                    if not self.filter:  # if the filter flag is off, proceed with original method
+                    if self.include_broadcast:  # if the filter flag is off, proceed with original method
                         data.update({'network': address})
                         data.update({'mask_bits': cidr})
                         data.update({'name': name})
