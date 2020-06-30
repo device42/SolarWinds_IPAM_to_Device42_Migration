@@ -157,7 +157,7 @@ class SwisClient():
                         time.sleep(1)
                         self.has_jobs(threads)
                         threads = [t for t in threads if not t.stopped]
-                        msg = 'Waiting for threads to finish. Current thread count: %s' % str(tcount)
+                        msg = 'Waiting for threads to finish. Current thread count: %s' % str(len(threads))
                         print msg
                     break
 
