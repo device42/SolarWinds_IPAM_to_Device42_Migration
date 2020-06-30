@@ -92,7 +92,7 @@ class SwisClient():
                 name    = result['friendlyname']
                 cidr    = result['cidr']
                 address = result['address']
-                if address and address != '0.0.0.0':
+                if address not in ['null', None] and cidr != 0:  # prevent empty address and universal netmask
                     data.update({'network': address})
                     data.update({'mask_bits': cidr})
                     data.update({'name': name})
@@ -136,24 +136,42 @@ class SwisClient():
                     if hlabel:
                         data.update({'tag': devicename})
                 q.put(data)
+
+            threads = []
             while 1:
                 if not q.empty():
-                    tcount = threading.active_count()
+                    self.has_jobs(threads)
+                    threads = [t for t in threads if not t.stopped]
+                    tcount = len(threads)
+
                     if tcount < 20:
                         ip = q.get()
                         print ip
-                        p = threading.Thread(target=d42.post_ip, args=(ip,) )
+                        p = CustomThread(target=d42.post_ip, args=(ip,))
                         p.start()
+                        threads.append(p)
                     else:
                         time.sleep(0.5)
                 else:
-                    tcount = threading.active_count()
-                    while tcount > 1:
+                    while len(threads) != 0:
                         time.sleep(1)
-                        tcount = threading.active_count()
-                        msg =  'Waiting for threads to finish. Current thread count: %s' % str(tcount)
+                        self.has_jobs(threads)
+                        threads = [t for t in threads if not t.stopped]
+                        msg = 'Waiting for threads to finish. Current thread count: %s' % str(tcount)
                         print msg
                     break
+
+    def has_jobs(self, threads):
+        for t in threads:
+            if not t.is_alive():
+                t.stopped = True
+
+
+class CustomThread(threading.Thread):
+    def __init__(self, target, args):
+        self.stopped = False
+        threading.Thread.__init__(self, target=target, args=args)
+
 
 def read_settings():
     if not os.path.exists(CONFIG):
