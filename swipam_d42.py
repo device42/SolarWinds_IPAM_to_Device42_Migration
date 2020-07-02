@@ -68,10 +68,11 @@ class Device42():
 
 
 class SwisClient():
-    def __init__(self, hostname, username, password):
+    def __init__(self, hostname, username, password, filter_broadcast):
         self.url            = "%s:17778/SolarWinds/InformationService/v3/Json/" % (hostname)
         self.credentials    = (username, password)
         self.headers        = {'Content-Type': 'application/json'}
+        self.include_broadcast         = filter_broadcast
 
     def get_data(self, payload=None):
         r = requests.request('POST', self.url + 'Query',
@@ -91,7 +92,7 @@ class SwisClient():
                 name    = result['friendlyname']
                 cidr    = result['cidr']
                 address = result['address']
-                if address and address != '0.0.0.0':
+                if address not in ['null', None] and cidr != 0:  # prevent empty address and universal netmask
                     data.update({'network': address})
                     data.update({'mask_bits': cidr})
                     data.update({'name': name})
@@ -104,6 +105,7 @@ class SwisClient():
 
     def get_ips(self):
         results = self.get_data({'query': 'SELECT ipaddress, mac, status, dnsbackward FROM  IPAM.IPNode'})
+
         if results:
             q = Queue.Queue()
             for result in results['results']:
@@ -112,6 +114,16 @@ class SwisClient():
                 macaddress  = result['mac']
                 status      = result['status']
                 devicename  = result['dnsbackward']
+                print ipaddress
+
+                if not self.include_broadcast:
+                    split_ip = ipaddress.split('.')
+                    last_ip_range_digit = split_ip[3]
+
+                    if last_ip_range_digit == '0' or last_ip_range_digit == '255':  # ip is broadcast ip
+                        print 'ip address {} is broadcast address, skipping'.format(ipaddress)
+                        continue
+
                 data.update({'ipaddress': ipaddress})
                 data.update({'macaddress': macaddress})
                 if status == 2:
@@ -124,24 +136,42 @@ class SwisClient():
                     if hlabel:
                         data.update({'tag': devicename})
                 q.put(data)
+
+            threads = []
             while 1:
                 if not q.empty():
-                    tcount = threading.active_count()
+                    self.has_jobs(threads)
+                    threads = [t for t in threads if not t.stopped]
+                    tcount = len(threads)
+
                     if tcount < 20:
                         ip = q.get()
                         print ip
-                        p = threading.Thread(target=d42.post_ip, args=(ip,) )
+                        p = CustomThread(target=d42.post_ip, args=(ip,))
                         p.start()
+                        threads.append(p)
                     else:
                         time.sleep(0.5)
                 else:
-                    tcount = threading.active_count()
-                    while tcount > 1:
+                    while len(threads) != 0:
                         time.sleep(1)
-                        tcount = threading.active_count()
-                        msg =  'Waiting for threads to finish. Current thread count: %s' % str(tcount)
+                        self.has_jobs(threads)
+                        threads = [t for t in threads if not t.stopped]
+                        msg = 'Waiting for threads to finish. Current thread count: %s' % str(len(threads))
                         print msg
                     break
+
+    def has_jobs(self, threads):
+        for t in threads:
+            if not t.is_alive():
+                t.stopped = True
+
+
+class CustomThread(threading.Thread):
+    def __init__(self, target, args):
+        self.stopped = False
+        threading.Thread.__init__(self, target=target, args=args)
+
 
 def read_settings():
     if not os.path.exists(CONFIG):
@@ -162,21 +192,24 @@ def read_settings():
     debug           = cc.getboolean('settings', 'debug')
     hdevice         = cc.getboolean('settings', 'send_hostname_as_device')
     hlabel          = cc.getboolean('settings', 'send_hostname_as_label')
+    filter_broadcast = cc.getboolean('settings', 'include_broadcast_addresses')
 
     return sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-           migrate_subnets, migrate_ips, debug, hdevice, hlabel
+           migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_broadcast
 
 
 if __name__ == "__main__":
     sw_ipam_server,sw_ipam_user,sw_ipam_secret,d42_server,d42_user,d42_secret,\
-    migrate_subnets, migrate_ips, debug, hdevice, hlabel = read_settings()
+    migrate_subnets, migrate_ips, debug, hdevice, hlabel, filter_broadcast = read_settings()
 
     d42     = Device42(d42_server, d42_user, d42_secret, debug, hdevice, hlabel)
-    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret)
+    swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_broadcast)
 
     if migrate_subnets:
+        print 'getting subnets'
         swis.get_subnets()
     if migrate_ips:
+        print 'getting ips'
         swis.get_ips()
 
     print '\n[!] Done!'
