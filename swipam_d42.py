@@ -3,10 +3,11 @@ import sys
 import os
 import json
 import base64
-import ConfigParser
+import configparser
 import threading
-import Queue
+import queue
 import time
+from requests.auth import HTTPBasicAuth
 
 import requests
 
@@ -33,37 +34,36 @@ class Device42():
     def uploader(self, data, url):
         payload = data
         headers = {
-            'Authorization': 'Basic ' + base64.b64encode(self.username + ':' + self.password),
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
-        r = requests.post(url, data=payload, headers=headers, verify=False)
-        msg = unicode(payload)
+        r = requests.post(url, data=payload, headers=headers, auth=HTTPBasicAuth(self.username, self.password), verify=False)
+        msg = str(payload)
         msgpayload = '\t[*] POST payload: %s' % msg
         if self.debug:
-            print msgpayload
+            print(msgpayload)
 
         msgstatus = '\t[+] Status code: %s' % str(r.status_code)
         if self.debug:
-            print msgstatus
+            print(msgstatus)
         msg = str(r.text)
         msgtext = '\t[*] Response: %s' % msg
         if self.debug:
-            print msgtext
+            print(msgtext)
         if r.status_code in (401, 403, 404, 500, 503):
-            print msgtext
+            print(msgtext)
         return msg
 
     def post_subnet(self, data, subnet):
         url = self.base_url + '/api/1.0/subnets/'
         msg = '\r\n[!] Posting subnet %s ' % subnet
-        print msg
+        print(msg)
         self.uploader(data, url)
 
     def post_ip(self, data):
         url = self.base_url + '/api/ip/'
         msg = '\r\n[!] Posting ip %s ' % data['ipaddress']
-        print msg
+        print(msg)
         self.uploader(data, url)
 
 
@@ -107,21 +107,21 @@ class SwisClient():
         results = self.get_data({'query': 'SELECT ipaddress, mac, status, dnsbackward FROM  IPAM.IPNode'})
 
         if results:
-            q = Queue.Queue()
+            q = queue.Queue()
             for result in results['results']:
                 data = {}
                 ipaddress   = result['ipaddress']
                 macaddress  = result['mac']
                 status      = result['status']
                 devicename  = result['dnsbackward']
-                print ipaddress
+                print(ipaddress)
 
                 if not self.include_broadcast:
                     split_ip = ipaddress.split('.')
                     last_ip_range_digit = split_ip[3]
 
                     if last_ip_range_digit == '0' or last_ip_range_digit == '255':  # ip is broadcast ip
-                        print 'ip address {} is broadcast address, skipping'.format(ipaddress)
+                        print('ip address {} is broadcast address, skipping'.format(ipaddress))
                         continue
 
                 data.update({'ipaddress': ipaddress})
@@ -146,7 +146,7 @@ class SwisClient():
 
                     if tcount < 20:
                         ip = q.get()
-                        print ip
+                        print(ip)
                         p = CustomThread(target=d42.post_ip, args=(ip,))
                         p.start()
                         threads.append(p)
@@ -158,7 +158,7 @@ class SwisClient():
                         self.has_jobs(threads)
                         threads = [t for t in threads if not t.stopped]
                         msg = 'Waiting for threads to finish. Current thread count: %s' % str(len(threads))
-                        print msg
+                        print(msg)
                     break
 
     def has_jobs(self, threads):
@@ -175,11 +175,11 @@ class CustomThread(threading.Thread):
 
 def read_settings():
     if not os.path.exists(CONFIG):
-        print '\n[!] Error. Cannot find config file!\n'
+        print('\n[!] Error. Cannot find config file!\n')
         sys.exit()
 
-    cc = ConfigParser.RawConfigParser()
-    cc.readfp(open(CONFIG,"r"))
+    cc = configparser.RawConfigParser()
+    cc.read(CONFIG)
 
     sw_ipam_server  = cc.get('settings', 'sw_ipam_server')
     sw_ipam_user    = cc.get('settings', 'sw_ipam_user')
@@ -206,12 +206,12 @@ if __name__ == "__main__":
     swis    = SwisClient(sw_ipam_server, sw_ipam_user, sw_ipam_secret, filter_broadcast)
 
     if migrate_subnets:
-        print 'getting subnets'
+        print('getting subnets')
         swis.get_subnets()
     if migrate_ips:
-        print 'getting ips'
+        print('getting ips')
         swis.get_ips()
 
-    print '\n[!] Done!'
+    print('\n[!] Done!')
     sys.exit()
 
